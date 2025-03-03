@@ -1,0 +1,32 @@
+{
+  "name": "Nanonets",
+  "urlPart": "nanonets",
+  "key": "nanonets",
+  "description": "",
+  "modules": [
+    {
+      "id": "ocr-1",
+      "name": "OCR",
+      "urlPart": "ocr",
+      "key": "ocr",
+      "description": "",
+      "version": 1
+    },
+    {
+      "id": "imageclassification-1",
+      "name": "Image Classification",
+      "urlPart": "imageclassification",
+      "key": "imageclassification",
+      "description": "",
+      "version": 1
+    },
+    {
+      "id": "externalintegrations-1",
+      "name": "External Integrations",
+      "urlPart": "externalintegrations",
+      "key": "externalintegrations",
+      "description": "",
+      "version": 1
+    }
+  ]
+}
