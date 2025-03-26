@@ -3,6 +3,7 @@ namespace Connector.OCR.v1.TrainingImagesFile.Upload;
 using Json.Schema.Generation;
 using System;
 using System.Text.Json.Serialization;
+using System.Collections.Generic;
 using Xchange.Connector.SDK.Action;
 
 /// <summary>
@@ -14,10 +15,10 @@ using Xchange.Connector.SDK.Action;
 /// are properly formed. The schema also helps provide integrators more information for what the values 
 /// are intended to be.
 /// </summary>
-[Description("UploadTrainingImagesFileAction Action description goes here")]
+[Description("Action for uploading training image files to the Nanonets OCR API")]
 public class UploadTrainingImagesFileAction : IStandardAction<UploadTrainingImagesFileActionInput, UploadTrainingImagesFileActionOutput>
 {
-    public UploadTrainingImagesFileActionInput ActionInput { get; set; } = new();
+    public UploadTrainingImagesFileActionInput ActionInput { get; set; } = new() { File = string.Empty };
     public UploadTrainingImagesFileActionOutput ActionOutput { get; set; } = new();
     public StandardActionFailure ActionFailure { get; set; } = new();
 
@@ -26,11 +27,85 @@ public class UploadTrainingImagesFileAction : IStandardAction<UploadTrainingImag
 
 public class UploadTrainingImagesFileActionInput
 {
+    [JsonPropertyName("file")]
+    [Description("Path to the file stored locally on your system")]
+    [Required]
+    public required string File { get; set; }
 
+    [JsonPropertyName("base64_data")]
+    [Description("Base64 encoded version of the file")]
+    public string? Base64Data { get; set; }
+
+    [JsonPropertyName("request_metadata")]
+    [Description("Metadata to save with the document")]
+    public Dictionary<string, string>? RequestMetadata { get; set; }
 }
 
 public class UploadTrainingImagesFileActionOutput
 {
+    [JsonPropertyName("message")]
+    [Description("Overall success status of the API call")]
+    public string? Message { get; set; }
+
+    [JsonPropertyName("result")]
+    [Description("List of objects representing each uploaded file")]
+    public List<UploadResult>? Result { get; set; }
+
+    [JsonPropertyName("signed_urls")]
+    [Description("Object containing signed URLs for accessing uploaded files")]
+    public Dictionary<string, SignedUrlInfo>? SignedUrls { get; set; }
+}
+
+public class UploadResult
+{
+    [JsonPropertyName("message")]
+    public string? Message { get; set; }
+
+    [JsonPropertyName("input")]
+    public string? Input { get; set; }
+
+    [JsonPropertyName("page")]
+    public int Page { get; set; }
+
+    [JsonPropertyName("request_file_id")]
+    public string? RequestFileId { get; set; }
+
     [JsonPropertyName("id")]
-    public Guid Id { get; set; }
+    public string? Id { get; set; }
+
+    [JsonPropertyName("request_metadata")]
+    public string? RequestMetadata { get; set; }
+
+    [JsonPropertyName("processing_type")]
+    public string? ProcessingType { get; set; }
+
+    [JsonPropertyName("size")]
+    public ImageSize? Size { get; set; }
+
+    [JsonPropertyName("filepath")]
+    public string? Filepath { get; set; }
+
+    [JsonPropertyName("rotation")]
+    public int Rotation { get; set; }
+
+    [JsonPropertyName("file_url")]
+    public string? FileUrl { get; set; }
+}
+
+public class ImageSize
+{
+    [JsonPropertyName("width")]
+    public int Width { get; set; }
+
+    [JsonPropertyName("height")]
+    public int Height { get; set; }
+}
+
+public class SignedUrlInfo
+{
+    [JsonPropertyName("original")]
+    public string? Original { get; set; }
+
+    [JsonPropertyName("original_with_long_expiry")]
+    public string? OriginalWithLongExpiry { get; set; }
 }

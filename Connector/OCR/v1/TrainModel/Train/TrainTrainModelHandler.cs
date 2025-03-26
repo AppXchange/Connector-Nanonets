@@ -12,16 +12,16 @@ using Xchange.Connector.SDK.Action;
 using Xchange.Connector.SDK.CacheWriter;
 using Xchange.Connector.SDK.Client.AppNetwork;
 
-namespace Connector.OCR.v1.TrainingImagesFile.Upload;
+namespace Connector.OCR.v1.TrainModel.Train;
 
-public class UploadTrainingImagesFileHandler : IActionHandler<UploadTrainingImagesFileAction>
+public class TrainTrainModelHandler : IActionHandler<TrainTrainModelAction>
 {
-    private readonly ILogger<UploadTrainingImagesFileHandler> _logger;
+    private readonly ILogger<TrainTrainModelHandler> _logger;
     private readonly ApiClient _apiClient;
     private readonly INanonetsApiKeyAuth _apiKeyAuth;
 
-    public UploadTrainingImagesFileHandler(
-        ILogger<UploadTrainingImagesFileHandler> logger,
+    public TrainTrainModelHandler(
+        ILogger<TrainTrainModelHandler> logger,
         ApiClient apiClient,
         INanonetsApiKeyAuth apiKeyAuth)
     {
@@ -32,7 +32,7 @@ public class UploadTrainingImagesFileHandler : IActionHandler<UploadTrainingImag
     
     public async Task<ActionHandlerOutcome> HandleQueuedActionAsync(ActionInstance actionInstance, CancellationToken cancellationToken)
     {
-        var input = JsonSerializer.Deserialize<UploadTrainingImagesFileActionInput>(actionInstance.InputJson);
+        var input = JsonSerializer.Deserialize<TrainTrainModelActionInput>(actionInstance.InputJson);
         if (input == null)
         {
             return ActionHandlerOutcome.Failed(new StandardActionFailure
@@ -42,7 +42,7 @@ public class UploadTrainingImagesFileHandler : IActionHandler<UploadTrainingImag
                 {
                     new Xchange.Connector.SDK.Action.Error
                     {
-                        Source = new[] { "UploadTrainingImagesFileHandler" },
+                        Source = new[] { "TrainTrainModelHandler" },
                         Text = "Invalid input data"
                     }
                 }
@@ -51,16 +51,13 @@ public class UploadTrainingImagesFileHandler : IActionHandler<UploadTrainingImag
 
         try
         {
-            var response = await _apiClient.PostTrainingImageFile(
+            var response = await _apiClient.TrainModel(
                 modelId: _apiKeyAuth.ModelId,
-                file: input.File,
-                base64Data: input.Base64Data,
-                requestMetadata: input.RequestMetadata,
                 cancellationToken: cancellationToken);
 
             if (!response.IsSuccessful)
             {
-                _logger.LogError("Failed to upload training image file. API StatusCode: {StatusCode}", response.StatusCode);
+                _logger.LogError("Failed to train model. API StatusCode: {StatusCode}", response.StatusCode);
                 return ActionHandlerOutcome.Failed(new StandardActionFailure
                 {
                     Code = response.StatusCode.ToString(),
@@ -68,35 +65,32 @@ public class UploadTrainingImagesFileHandler : IActionHandler<UploadTrainingImag
                     {
                         new Xchange.Connector.SDK.Action.Error
                         {
-                            Source = new[] { "UploadTrainingImagesFileHandler" },
-                            Text = $"Failed to upload training image file: {response.StatusCode}"
+                            Source = new[] { "TrainTrainModelHandler" },
+                            Text = $"Failed to train model: {response.StatusCode}"
                         }
                     }
                 });
             }
 
             var operations = new List<SyncOperation>();
-            if (response.Data?.Result != null)
+            if (response.Data != null)
             {
-                foreach (var result in response.Data.Result)
-                {
-                    var keyResolver = new DefaultDataObjectKey();
-                    var key = keyResolver.BuildKeyResolver()(result);
-                    operations.Add(SyncOperation.CreateSyncOperation(UpdateOperation.Upsert.ToString(), key.UrlPart, key.PropertyNames, result));
-                }
+                var keyResolver = new DefaultDataObjectKey();
+                var key = keyResolver.BuildKeyResolver()(response.Data);
+                operations.Add(SyncOperation.CreateSyncOperation(UpdateOperation.Upsert.ToString(), key.UrlPart, key.PropertyNames, response.Data));
             }
 
             var resultList = new List<CacheSyncCollection>
             {
-                new CacheSyncCollection() { DataObjectType = typeof(UploadResult), CacheChanges = operations.ToArray() }
+                new CacheSyncCollection() { DataObjectType = typeof(TrainModelDataObject), CacheChanges = operations.ToArray() }
             };
 
             return ActionHandlerOutcome.Successful(response.Data, resultList);
         }
         catch (HttpRequestException exception)
         {
-            _logger.LogError(exception, "Exception while uploading training image file");
-            var errorSource = new List<string> { "UploadTrainingImagesFileHandler" };
+            _logger.LogError(exception, "Exception while training model");
+            var errorSource = new List<string> { "TrainTrainModelHandler" };
             if (!string.IsNullOrEmpty(exception.Source)) errorSource.Add(exception.Source);
             
             return ActionHandlerOutcome.Failed(new StandardActionFailure

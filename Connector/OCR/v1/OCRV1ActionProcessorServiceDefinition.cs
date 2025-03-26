@@ -9,6 +9,8 @@ using Connector.OCR.v1.TrainingImagesFile;
 using Connector.OCR.v1.TrainingImagesFile.Upload;
 using Connector.OCR.v1.TrainingImagesURL;
 using Connector.OCR.v1.TrainingImagesURL.Upload;
+using Connector.OCR.v1.TrainModel;
+using Connector.OCR.v1.TrainModel.Train;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Text.Json;
@@ -41,6 +43,7 @@ public class OCRV1ActionProcessorServiceDefinition : BaseActionHandlerServiceDef
         serviceCollection.AddScoped<PredictionImageURLHandler>();
         serviceCollection.AddScoped<UploadTrainingImagesFileHandler>();
         serviceCollection.AddScoped<UploadTrainingImagesURLHandler>();
+        serviceCollection.AddScoped<TrainTrainModelHandler>();
     }
 
     public override void ConfigureService(IActionHandlerService service, OCRV1ActionProcessorConfig config)
@@ -52,5 +55,6 @@ public class OCRV1ActionProcessorServiceDefinition : BaseActionHandlerServiceDef
         service.RegisterHandlerForDataObjectAction<PredictionImageURLHandler, ImageURLDataObject>(ModuleId, "image-url", "prediction", config.PredictionImageURLConfig);
         service.RegisterHandlerForDataObjectAction<UploadTrainingImagesFileHandler, TrainingImagesFileDataObject>(ModuleId, "training-images-file", "upload", config.UploadTrainingImagesFileConfig);
         service.RegisterHandlerForDataObjectAction<UploadTrainingImagesURLHandler, TrainingImagesURLDataObject>(ModuleId, "training-images-url", "upload", config.UploadTrainingImagesURLConfig);
+        service.RegisterHandlerForDataObjectAction<TrainTrainModelHandler, TrainModelDataObject>(ModuleId, "train-model", "train", config.TrainTrainModelConfig);
     }
 }

@@ -2,6 +2,7 @@ namespace Connector.ExternalIntegrations.v1.GenericQuery.Execute;
 
 using Json.Schema.Generation;
 using System;
+using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using Xchange.Connector.SDK.Action;
 
@@ -14,10 +15,10 @@ using Xchange.Connector.SDK.Action;
 /// are properly formed. The schema also helps provide integrators more information for what the values 
 /// are intended to be.
 /// </summary>
-[Description("ExecuteGenericQueryAction Action description goes here")]
+[Description("Action for executing a generic query against an external integration")]
 public class ExecuteGenericQueryAction : IStandardAction<ExecuteGenericQueryActionInput, ExecuteGenericQueryActionOutput>
 {
-    public ExecuteGenericQueryActionInput ActionInput { get; set; } = new();
+    public ExecuteGenericQueryActionInput ActionInput { get; set; } = new() { ExternalIntegrationId = string.Empty, Query = string.Empty };
     public ExecuteGenericQueryActionOutput ActionOutput { get; set; } = new();
     public StandardActionFailure ActionFailure { get; set; } = new();
 
@@ -26,11 +27,63 @@ public class ExecuteGenericQueryAction : IStandardAction<ExecuteGenericQueryActi
 
 public class ExecuteGenericQueryActionInput
 {
+    [JsonPropertyName("external_integration_id")]
+    [Description("ID of the external integration to execute the query against")]
+    [Required]
+    public required string ExternalIntegrationId { get; set; }
 
+    [JsonPropertyName("query")]
+    [Description("The SQL query to execute")]
+    [Required]
+    public required string Query { get; set; }
 }
 
 public class ExecuteGenericQueryActionOutput
 {
-    [JsonPropertyName("id")]
-    public Guid Id { get; set; }
+    [JsonPropertyName("results")]
+    [Description("Array of query results")]
+    public List<QueryResult>? Results { get; set; }
+}
+
+public class QueryResult
+{
+    [JsonPropertyName("birthplace")]
+    [Description("Place of birth")]
+    public string? Birthplace { get; set; }
+
+    [JsonPropertyName("dob")]
+    [Description("Date of birth")]
+    public string? Dob { get; set; }
+
+    [JsonPropertyName("doi")]
+    [Description("Date of issue")]
+    public string? Doi { get; set; }
+
+    [JsonPropertyName("file")]
+    [Description("File identifier")]
+    public string? File { get; set; }
+
+    [JsonPropertyName("firstname")]
+    [Description("First name")]
+    public string? Firstname { get; set; }
+
+    [JsonPropertyName("mrz")]
+    [Description("Machine Readable Zone data")]
+    public string? Mrz { get; set; }
+
+    [JsonPropertyName("nationality")]
+    [Description("Nationality")]
+    public string? Nationality { get; set; }
+
+    [JsonPropertyName("passport")]
+    [Description("Passport number")]
+    public string? Passport { get; set; }
+
+    [JsonPropertyName("sex")]
+    [Description("Gender")]
+    public string? Sex { get; set; }
+
+    [JsonPropertyName("surname")]
+    [Description("Last name")]
+    public string? Surname { get; set; }
 }

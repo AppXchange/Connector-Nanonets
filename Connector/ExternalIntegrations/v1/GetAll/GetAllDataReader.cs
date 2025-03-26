@@ -14,65 +14,46 @@ namespace Connector.ExternalIntegrations.v1.GetAll;
 public class GetAllDataReader : TypedAsyncDataReaderBase<GetAllDataObject>
 {
     private readonly ILogger<GetAllDataReader> _logger;
-    private int _currentPage = 0;
+    private readonly ApiClient _apiClient;
 
     public GetAllDataReader(
-        ILogger<GetAllDataReader> logger)
+        ILogger<GetAllDataReader> logger,
+        ApiClient apiClient)
     {
         _logger = logger;
+        _apiClient = apiClient;
     }
 
-    public override async IAsyncEnumerable<GetAllDataObject> GetTypedDataAsync(DataObjectCacheWriteArguments ? dataObjectRunArguments, [EnumeratorCancellation] CancellationToken cancellationToken)
+    public override async IAsyncEnumerable<GetAllDataObject> GetTypedDataAsync(
+        DataObjectCacheWriteArguments? dataObjectRunArguments,
+        CancellationToken cancellationToken)
     {
-        while (true)
+        if (dataObjectRunArguments == null)
         {
-            var response = new ApiResponse<PaginatedResponse<GetAllDataObject>>();
-            // If the GetAllDataObject does not have the same structure as the GetAll response from the API, create a new class for it and replace GetAllDataObject with it.
-            // Example:
-            // var response = new ApiResponse<IEnumerable<GetAllResponse>>();
+            _logger.LogError("Data object run arguments are null");
+            yield break;
+        }
 
-            // Make a call to your API/system to retrieve the objects/type for the connector's configuration.
-            try
-            {
-                //response = await _apiClient.GetRecords<GetAllDataObject>(
-                //    relativeUrl: "getAlls",
-                //    page: _currentPage,
-                //    cancellationToken: cancellationToken)
-                //    .ConfigureAwait(false);
-            }
-            catch (HttpRequestException exception)
-            {
-                _logger.LogError(exception, "Exception while making a read request to data object 'GetAllDataObject'");
-                throw;
-            }
+        ApiResponse<IEnumerable<GetAllDataObject>>? response = null;
+        try
+        {
+            response = await _apiClient.GetExternalIntegrations(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving external integrations");
+            throw;
+        }
 
-            if (!response.IsSuccessful)
-            {
-                throw new Exception($"Failed to retrieve records for 'GetAllDataObject'. API StatusCode: {response.StatusCode}");
-            }
+        if (!response.IsSuccessful || response.Data == null)
+        {
+            _logger.LogError("Failed to retrieve external integrations. Status code: {StatusCode}", response.StatusCode);
+            yield break;
+        }
 
-            if (response.Data == null || !response.Data.Items.Any()) break;
-
-            // Return the data objects to Cache.
-            foreach (var item in response.Data.Items)
-            {
-                // If new class was created to match the API response, create a new GetAllDataObject object, map the properties and return a GetAllDataObject.
-
-                // Example:
-                //var resource = new GetAllDataObject
-                //{
-                //// TODO: Map properties.      
-                //};
-                //yield return resource;
-                yield return item;
-            }
-
-            // Handle pagination per API client design
-            _currentPage++;
-            if (_currentPage >= response.Data.TotalPages)
-            {
-                break;
-            }
+        foreach (var integration in response.Data)
+        {
+            yield return integration;
         }
     }
 }

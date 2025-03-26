@@ -16,11 +16,17 @@ namespace Connector.ImageClassification.v1.ImageFile.Predict;
 public class PredictImageFileHandler : IActionHandler<PredictImageFileAction>
 {
     private readonly ILogger<PredictImageFileHandler> _logger;
+    private readonly ApiClient _apiClient;
+    private readonly IHttpClientFactory _httpClientFactory;
 
     public PredictImageFileHandler(
-        ILogger<PredictImageFileHandler> logger)
+        ILogger<PredictImageFileHandler> logger,
+        ApiClient apiClient,
+        IHttpClientFactory httpClientFactory)
     {
         _logger = logger;
+        _apiClient = apiClient;
+        _httpClientFactory = httpClientFactory;
     }
     
     public async Task<ActionHandlerOutcome> HandleQueuedActionAsync(ActionInstance actionInstance, CancellationToken cancellationToken)
@@ -28,26 +34,48 @@ public class PredictImageFileHandler : IActionHandler<PredictImageFileAction>
         var input = JsonSerializer.Deserialize<PredictImageFileActionInput>(actionInstance.InputJson);
         try
         {
-            // Given the input for the action, make a call to your API/system
-            var response = new ApiResponse<PredictImageFileActionOutput>();
-            // response = await _apiClient.PostImageFileDataObject(input, cancellationToken)
-            // .ConfigureAwait(false);
+            using var fileClient = _httpClientFactory.CreateClient();
+            using var fileResponse = await fileClient.GetAsync(
+                input.File,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken: cancellationToken);
 
-            // The full record is needed for SyncOperations. If the endpoint used for the action returns a partial record (such as only returning the ID) then you can either:
-            // - Make a GET call using the ID that was returned
-            // - Add the ID property to your action input (Assuming this results in the proper data object shape)
+            if (!fileResponse.IsSuccessStatusCode)
+            {
+                return ActionHandlerOutcome.Failed(new StandardActionFailure
+                {
+                    Code = fileResponse.StatusCode.ToString(),
+                    Errors = new[]
+                    {
+                        new Error
+                        {
+                            Source = new[] { nameof(PredictImageFileHandler) },
+                            Text = $"Failed to retrieve file from URL: {input.File}"
+                        }
+                    }
+                });
+            }
 
-            // var resource = await _apiClient.GetImageFileDataObject(response.Data.id, cancellationToken);
+            var response = await _apiClient.PredictImageFile(
+                await fileResponse.Content.ReadAsStreamAsync(cancellationToken),
+                cancellationToken);
 
-            // var resource = new PredictImageFileActionOutput
-            // {
-            //      TODO : map
-            // };
+            if (!response.IsSuccessful || response.Data == default)
+            {
+                return ActionHandlerOutcome.Failed(new StandardActionFailure
+                {
+                    Code = response.StatusCode.ToString(),
+                    Errors = new[]
+                    {
+                        new Error
+                        {
+                            Source = new[] { nameof(PredictImageFileHandler) },
+                            Text = $"Failed to predict image file. Status code: {response.StatusCode}"
+                        }
+                    }
+                });
+            }
 
-            // If the response is already the output object for the action, you can use the response directly
-
-            // Build sync operations to update the local cache as well as the Xchange cache system (if the data type is cached)
-            // For more information on SyncOperations and the KeyResolver, check: https://trimble-xchange.github.io/connector-docs/guides/creating-actions/#keyresolver-and-the-sync-cache-operations
             var operations = new List<SyncOperation>();
             var keyResolver = new DefaultDataObjectKey();
             var key = keyResolver.BuildKeyResolver()(response.Data);
@@ -62,19 +90,15 @@ public class PredictImageFileHandler : IActionHandler<PredictImageFileAction>
         }
         catch (HttpRequestException exception)
         {
-            // If an error occurs, we want to create a failure result for the action that matches
-            // the failure type for the action. 
-            // Common to create extension methods to map to Standard Action Failure
-
-            var errorSource = new List<string> { "PredictImageFileHandler" };
+            var errorSource = new List<string> { nameof(PredictImageFileHandler) };
             if (string.IsNullOrEmpty(exception.Source)) errorSource.Add(exception.Source!);
             
             return ActionHandlerOutcome.Failed(new StandardActionFailure
             {
                 Code = exception.StatusCode?.ToString() ?? "500",
-                Errors = new []
+                Errors = new[]
                 {
-                    new Xchange.Connector.SDK.Action.Error
+                    new Error
                     {
                         Source = errorSource.ToArray(),
                         Text = exception.Message

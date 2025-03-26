@@ -1,7 +1,8 @@
 using Connector.Client;
-using System;
+using Connector.Connections;
 using ESR.Hosting.CacheWriter;
 using Microsoft.Extensions.Logging;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -11,68 +12,96 @@ using System.Net.Http;
 
 namespace Connector.OCR.v1.PredictionFileByFileID;
 
+internal static class DataObjectExtensions
+{
+    public static bool TryGetParameterValue<T>(this DataObjectCacheWriteArguments args, string key, out T? value)
+    {
+        value = default;
+        if (args == null) return false;
+
+        var dict = args.GetType().GetProperty("Arguments")?.GetValue(args) as IDictionary<string, object>;
+        if (dict == null || !dict.ContainsKey(key)) return false;
+
+        try
+        {
+            value = (T)dict[key];
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+}
+
 public class PredictionFileByFileIDDataReader : TypedAsyncDataReaderBase<PredictionFileByFileIDDataObject>
 {
     private readonly ILogger<PredictionFileByFileIDDataReader> _logger;
-    private int _currentPage = 0;
+    private readonly ApiClient _apiClient;
+    private readonly INanonetsApiKeyAuth _apiKeyAuth;
 
     public PredictionFileByFileIDDataReader(
-        ILogger<PredictionFileByFileIDDataReader> logger)
+        ILogger<PredictionFileByFileIDDataReader> logger,
+        ApiClient apiClient,
+        INanonetsApiKeyAuth apiKeyAuth)
     {
         _logger = logger;
+        _apiClient = apiClient;
+        _apiKeyAuth = apiKeyAuth;
     }
 
-    public override async IAsyncEnumerable<PredictionFileByFileIDDataObject> GetTypedDataAsync(DataObjectCacheWriteArguments ? dataObjectRunArguments, [EnumeratorCancellation] CancellationToken cancellationToken)
+    public override async IAsyncEnumerable<PredictionFileByFileIDDataObject> GetTypedDataAsync(
+        DataObjectCacheWriteArguments? dataObjectRunArguments,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        while (true)
+        if (dataObjectRunArguments == null || !dataObjectRunArguments.TryGetParameterValue("request_file_id", out string? requestFileId) || string.IsNullOrEmpty(requestFileId))
         {
-            var response = new ApiResponse<PaginatedResponse<PredictionFileByFileIDDataObject>>();
-            // If the PredictionFileByFileIDDataObject does not have the same structure as the PredictionFileByFileID response from the API, create a new class for it and replace PredictionFileByFileIDDataObject with it.
-            // Example:
-            // var response = new ApiResponse<IEnumerable<PredictionFileByFileIDResponse>>();
+            _logger.LogError("request_file_id parameter is required but was not provided");
+            yield break;
+        }
 
-            // Make a call to your API/system to retrieve the objects/type for the connector's configuration.
-            try
-            {
-                //response = await _apiClient.GetRecords<PredictionFileByFileIDDataObject>(
-                //    relativeUrl: "predictionFileByFileIDs",
-                //    page: _currentPage,
-                //    cancellationToken: cancellationToken)
-                //    .ConfigureAwait(false);
-            }
-            catch (HttpRequestException exception)
-            {
-                _logger.LogError(exception, "Exception while making a read request to data object 'PredictionFileByFileIDDataObject'");
-                throw;
-            }
+        PredictionFileByFileIDResponse? data;
+        try
+        {
+            var response = await _apiClient.GetPredictionFileByFileId(
+                modelId: _apiKeyAuth.ModelId,
+                requestFileId: requestFileId,
+                cancellationToken: cancellationToken);
 
             if (!response.IsSuccessful)
             {
-                throw new Exception($"Failed to retrieve records for 'PredictionFileByFileIDDataObject'. API StatusCode: {response.StatusCode}");
+                _logger.LogError("Failed to retrieve prediction file. API StatusCode: {StatusCode}", response.StatusCode);
+                throw new Exception($"Failed to retrieve prediction file. API StatusCode: {response.StatusCode}");
             }
 
-            if (response.Data == null || !response.Data.Items.Any()) break;
+            data = response.Data;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Exception while making a read request to Nanonets API");
+            throw;
+        }
 
-            // Return the data objects to Cache.
-            foreach (var item in response.Data.Items)
-            {
-                // If new class was created to match the API response, create a new PredictionFileByFileIDDataObject object, map the properties and return a PredictionFileByFileIDDataObject.
+        if (data == null)
+        {
+            _logger.LogWarning("No prediction data returned from the API");
+            yield break;
+        }
 
-                // Example:
-                //var resource = new PredictionFileByFileIDDataObject
-                //{
-                //// TODO: Map properties.      
-                //};
-                //yield return resource;
-                yield return item;
-            }
+        var results = new List<PredictionFileByFileIDDataObject>();
+        if (data.ModeratedImagesCount > 0 && data.ModeratedImages != null)
+        {
+            results.AddRange(data.ModeratedImages);
+        }
 
-            // Handle pagination per API client design
-            _currentPage++;
-            if (_currentPage >= response.Data.TotalPages)
-            {
-                break;
-            }
+        if (data.UnmoderatedImagesCount > 0 && data.UnmoderatedImages != null)
+        {
+            results.AddRange(data.UnmoderatedImages);
+        }
+
+        foreach (var result in results)
+        {
+            yield return result;
         }
     }
 }

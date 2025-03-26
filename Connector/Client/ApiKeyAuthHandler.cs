@@ -1,4 +1,7 @@
+using System;
 using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Xchange.Connector.SDK.Client.AuthTypes;
@@ -16,8 +19,9 @@ public class ApiKeyAuthHandler : DelegatingHandler
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
-        request.Headers.Remove("X-Api-Key");
-        request.Headers.Add("X-Api-Key", _apiKeyAuth.ApiKey);
+        // Add Basic Authentication header with API key as username and empty password
+        var credentials = Convert.ToBase64String(Encoding.ASCII.GetBytes($"{_apiKeyAuth.ApiKey}:"));
+        request.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
 
         return await base.SendAsync(request, cancellationToken);
     }

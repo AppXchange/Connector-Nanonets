@@ -1,4 +1,5 @@
 using Connector.Client;
+using Connector.Connections;
 using ESR.Hosting.Action;
 using ESR.Hosting.CacheWriter;
 using Microsoft.Extensions.Logging;
@@ -16,42 +17,74 @@ namespace Connector.OCR.v1.ImageFile.AsyncPrediction;
 public class AsyncPredictionImageFileHandler : IActionHandler<AsyncPredictionImageFileAction>
 {
     private readonly ILogger<AsyncPredictionImageFileHandler> _logger;
+    private readonly ApiClient _apiClient;
+    private readonly INanonetsApiKeyAuth _apiKeyAuth;
 
     public AsyncPredictionImageFileHandler(
-        ILogger<AsyncPredictionImageFileHandler> logger)
+        ILogger<AsyncPredictionImageFileHandler> logger,
+        ApiClient apiClient,
+        INanonetsApiKeyAuth apiKeyAuth)
     {
         _logger = logger;
+        _apiClient = apiClient;
+        _apiKeyAuth = apiKeyAuth;
     }
     
     public async Task<ActionHandlerOutcome> HandleQueuedActionAsync(ActionInstance actionInstance, CancellationToken cancellationToken)
     {
         var input = JsonSerializer.Deserialize<AsyncPredictionImageFileActionInput>(actionInstance.InputJson);
+        if (input == null)
+        {
+            return ActionHandlerOutcome.Failed(new StandardActionFailure
+            {
+                Code = "400",
+                Errors = new[]
+                {
+                    new Xchange.Connector.SDK.Action.Error
+                    {
+                        Source = new[] { "AsyncPredictionImageFileHandler" },
+                        Text = "Invalid input data"
+                    }
+                }
+            });
+        }
+
         try
         {
-            // Given the input for the action, make a call to your API/system
-            var response = new ApiResponse<AsyncPredictionImageFileActionOutput>();
-            // response = await _apiClient.PostImageFileDataObject(input, cancellationToken)
-            // .ConfigureAwait(false);
+            var response = await _apiClient.PostImageFileAsync(
+                modelId: _apiKeyAuth.ModelId,
+                file: input.File,
+                base64Data: input.Base64Data,
+                requestMetadata: input.RequestMetadata,
+                cancellationToken: cancellationToken);
 
-            // The full record is needed for SyncOperations. If the endpoint used for the action returns a partial record (such as only returning the ID) then you can either:
-            // - Make a GET call using the ID that was returned
-            // - Add the ID property to your action input (Assuming this results in the proper data object shape)
+            if (!response.IsSuccessful)
+            {
+                _logger.LogError("Failed to submit image for async prediction. API StatusCode: {StatusCode}", response.StatusCode);
+                return ActionHandlerOutcome.Failed(new StandardActionFailure
+                {
+                    Code = response.StatusCode.ToString(),
+                    Errors = new[]
+                    {
+                        new Xchange.Connector.SDK.Action.Error
+                        {
+                            Source = new[] { "AsyncPredictionImageFileHandler" },
+                            Text = $"Failed to submit image for async prediction: {response.StatusCode}"
+                        }
+                    }
+                });
+            }
 
-            // var resource = await _apiClient.GetImageFileDataObject(response.Data.id, cancellationToken);
-
-            // var resource = new AsyncPredictionImageFileActionOutput
-            // {
-            //      TODO : map
-            // };
-
-            // If the response is already the output object for the action, you can use the response directly
-
-            // Build sync operations to update the local cache as well as the Xchange cache system (if the data type is cached)
-            // For more information on SyncOperations and the KeyResolver, check: https://trimble-xchange.github.io/connector-docs/guides/creating-actions/#keyresolver-and-the-sync-cache-operations
             var operations = new List<SyncOperation>();
-            var keyResolver = new DefaultDataObjectKey();
-            var key = keyResolver.BuildKeyResolver()(response.Data);
-            operations.Add(SyncOperation.CreateSyncOperation(UpdateOperation.Upsert.ToString(), key.UrlPart, key.PropertyNames, response.Data));
+            if (response.Data?.Result != null)
+            {
+                foreach (var result in response.Data.Result)
+                {
+                    var keyResolver = new DefaultDataObjectKey();
+                    var key = keyResolver.BuildKeyResolver()(result);
+                    operations.Add(SyncOperation.CreateSyncOperation(UpdateOperation.Upsert.ToString(), key.UrlPart, key.PropertyNames, result));
+                }
+            }
 
             var resultList = new List<CacheSyncCollection>
             {
@@ -62,17 +95,14 @@ public class AsyncPredictionImageFileHandler : IActionHandler<AsyncPredictionIma
         }
         catch (HttpRequestException exception)
         {
-            // If an error occurs, we want to create a failure result for the action that matches
-            // the failure type for the action. 
-            // Common to create extension methods to map to Standard Action Failure
-
+            _logger.LogError(exception, "Exception while submitting image for async prediction");
             var errorSource = new List<string> { "AsyncPredictionImageFileHandler" };
-            if (string.IsNullOrEmpty(exception.Source)) errorSource.Add(exception.Source!);
+            if (!string.IsNullOrEmpty(exception.Source)) errorSource.Add(exception.Source);
             
             return ActionHandlerOutcome.Failed(new StandardActionFailure
             {
                 Code = exception.StatusCode?.ToString() ?? "500",
-                Errors = new []
+                Errors = new[]
                 {
                     new Xchange.Connector.SDK.Action.Error
                     {

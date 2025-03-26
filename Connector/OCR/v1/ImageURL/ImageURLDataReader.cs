@@ -1,4 +1,5 @@
 using Connector.Client;
+using Connector.Connections;
 using System;
 using ESR.Hosting.CacheWriter;
 using Microsoft.Extensions.Logging;
@@ -8,71 +9,115 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using Xchange.Connector.SDK.CacheWriter;
 using System.Net.Http;
+using Connector.OCR.v1.PredictionFileByFileID;
+using AsyncPrediction = Connector.OCR.v1.PredictionFileByFileID;
 
 namespace Connector.OCR.v1.ImageURL;
+
+internal static class DataObjectExtensions
+{
+    public static bool TryGetParameterValue<T>(this DataObjectCacheWriteArguments args, string key, out T? value)
+    {
+        value = default;
+        if (args == null) return false;
+
+        var dict = args.GetType().GetProperty("Arguments")?.GetValue(args) as IDictionary<string, object>;
+        if (dict == null || !dict.ContainsKey(key)) return false;
+
+        try
+        {
+            value = (T)dict[key];
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+}
 
 public class ImageURLDataReader : TypedAsyncDataReaderBase<ImageURLDataObject>
 {
     private readonly ILogger<ImageURLDataReader> _logger;
-    private int _currentPage = 0;
+    private readonly ApiClient _apiClient;
+    private readonly INanonetsApiKeyAuth _apiKeyAuth;
 
     public ImageURLDataReader(
-        ILogger<ImageURLDataReader> logger)
+        ILogger<ImageURLDataReader> logger,
+        ApiClient apiClient,
+        INanonetsApiKeyAuth apiKeyAuth)
     {
         _logger = logger;
+        _apiClient = apiClient;
+        _apiKeyAuth = apiKeyAuth;
     }
 
-    public override async IAsyncEnumerable<ImageURLDataObject> GetTypedDataAsync(DataObjectCacheWriteArguments ? dataObjectRunArguments, [EnumeratorCancellation] CancellationToken cancellationToken)
+    public override async IAsyncEnumerable<ImageURLDataObject> GetTypedDataAsync(
+        DataObjectCacheWriteArguments? dataObjectRunArguments,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        while (true)
+        if (dataObjectRunArguments == null)
         {
-            var response = new ApiResponse<PaginatedResponse<ImageURLDataObject>>();
-            // If the ImageURLDataObject does not have the same structure as the ImageURL response from the API, create a new class for it and replace ImageURLDataObject with it.
-            // Example:
-            // var response = new ApiResponse<IEnumerable<ImageURLResponse>>();
+            _logger.LogError("Data object run arguments are required but were not provided");
+            yield break;
+        }
 
-            // Make a call to your API/system to retrieve the objects/type for the connector's configuration.
-            try
+        var results = new List<ImageURLDataObject>();
+        try
+        {
+            if (!dataObjectRunArguments.TryGetParameterValue("request_file_id", out string? requestFileId) || string.IsNullOrEmpty(requestFileId))
             {
-                //response = await _apiClient.GetRecords<ImageURLDataObject>(
-                //    relativeUrl: "imageURLs",
-                //    page: _currentPage,
-                //    cancellationToken: cancellationToken)
-                //    .ConfigureAwait(false);
+                _logger.LogError("request_file_id parameter is required but was not provided");
+                yield break;
             }
-            catch (HttpRequestException exception)
-            {
-                _logger.LogError(exception, "Exception while making a read request to data object 'ImageURLDataObject'");
-                throw;
-            }
+
+            var response = await _apiClient.GetPredictionFileByFileId(
+                modelId: _apiKeyAuth.ModelId,
+                requestFileId: requestFileId,
+                cancellationToken: cancellationToken);
 
             if (!response.IsSuccessful)
             {
-                throw new Exception($"Failed to retrieve records for 'ImageURLDataObject'. API StatusCode: {response.StatusCode}");
+                _logger.LogError("Failed to retrieve image URL data. API StatusCode: {StatusCode}", response.StatusCode);
+                throw new Exception($"Failed to retrieve image URL data. API StatusCode: {response.StatusCode}");
             }
 
-            if (response.Data == null || !response.Data.Items.Any()) break;
-
-            // Return the data objects to Cache.
-            foreach (var item in response.Data.Items)
+            if (response.Data?.ModeratedImages != null)
             {
-                // If new class was created to match the API response, create a new ImageURLDataObject object, map the properties and return a ImageURLDataObject.
-
-                // Example:
-                //var resource = new ImageURLDataObject
-                //{
-                //// TODO: Map properties.      
-                //};
-                //yield return resource;
-                yield return item;
+                results.AddRange(response.Data.ModeratedImages.Select<PredictionFileByFileIDDataObject, ImageURLDataObject>(MapToImageURLDataObject));
             }
 
-            // Handle pagination per API client design
-            _currentPage++;
-            if (_currentPage >= response.Data.TotalPages)
+            if (response.Data?.UnmoderatedImages != null)
             {
-                break;
+                results.AddRange(response.Data.UnmoderatedImages.Select<PredictionFileByFileIDDataObject, ImageURLDataObject>(MapToImageURLDataObject));
             }
         }
+        catch (HttpRequestException exception)
+        {
+            _logger.LogError(exception, "Exception while retrieving image URL data");
+            throw;
+        }
+
+        foreach (var result in results)
+        {
+            yield return result;
+        }
+    }
+
+    private static ImageURLDataObject MapToImageURLDataObject(PredictionFileByFileIDDataObject source)
+    {
+        return new ImageURLDataObject
+        {
+            Id = source.Id,
+            Page = source.Page,
+            RequestFileId = source.RequestFileId,
+            FileUrl = source.FileUrl,
+            ProcessingType = source.ProcessingType,
+            Size = new AsyncPrediction.ImageSize 
+            { 
+                Width = source.Size?.Width ?? 0,
+                Height = source.Size?.Height ?? 0
+            }
+        };
     }
 }

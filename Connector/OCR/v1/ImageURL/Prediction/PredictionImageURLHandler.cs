@@ -1,4 +1,5 @@
 using Connector.Client;
+using Connector.Connections;
 using ESR.Hosting.Action;
 using ESR.Hosting.CacheWriter;
 using Microsoft.Extensions.Logging;
@@ -16,63 +17,93 @@ namespace Connector.OCR.v1.ImageURL.Prediction;
 public class PredictionImageURLHandler : IActionHandler<PredictionImageURLAction>
 {
     private readonly ILogger<PredictionImageURLHandler> _logger;
+    private readonly ApiClient _apiClient;
+    private readonly INanonetsApiKeyAuth _apiKeyAuth;
 
     public PredictionImageURLHandler(
-        ILogger<PredictionImageURLHandler> logger)
+        ILogger<PredictionImageURLHandler> logger,
+        ApiClient apiClient,
+        INanonetsApiKeyAuth apiKeyAuth)
     {
         _logger = logger;
+        _apiClient = apiClient;
+        _apiKeyAuth = apiKeyAuth;
     }
     
     public async Task<ActionHandlerOutcome> HandleQueuedActionAsync(ActionInstance actionInstance, CancellationToken cancellationToken)
     {
         var input = JsonSerializer.Deserialize<PredictionImageURLActionInput>(actionInstance.InputJson);
+        if (input == null)
+        {
+            return ActionHandlerOutcome.Failed(new StandardActionFailure
+            {
+                Code = "400",
+                Errors = new[]
+                {
+                    new Xchange.Connector.SDK.Action.Error
+                    {
+                        Source = new[] { "PredictionImageURLHandler" },
+                        Text = "Invalid input data"
+                    }
+                }
+            });
+        }
+
         try
         {
-            // Given the input for the action, make a call to your API/system
-            var response = new ApiResponse<PredictionImageURLActionOutput>();
-            // response = await _apiClient.PostImageURLDataObject(input, cancellationToken)
-            // .ConfigureAwait(false);
+            var response = await _apiClient.PostImageURL(
+                modelId: _apiKeyAuth.ModelId,
+                urls: input.Urls,
+                base64Data: input.Base64Data,
+                requestMetadata: input.RequestMetadata,
+                pagesToProcess: input.PagesToProcess,
+                cancellationToken: cancellationToken);
 
-            // The full record is needed for SyncOperations. If the endpoint used for the action returns a partial record (such as only returning the ID) then you can either:
-            // - Make a GET call using the ID that was returned
-            // - Add the ID property to your action input (Assuming this results in the proper data object shape)
+            if (!response.IsSuccessful)
+            {
+                _logger.LogError("Failed to submit image URLs for prediction. API StatusCode: {StatusCode}", response.StatusCode);
+                return ActionHandlerOutcome.Failed(new StandardActionFailure
+                {
+                    Code = response.StatusCode.ToString(),
+                    Errors = new[]
+                    {
+                        new Xchange.Connector.SDK.Action.Error
+                        {
+                            Source = new[] { "PredictionImageURLHandler" },
+                            Text = $"Failed to submit image URLs for prediction: {response.StatusCode}"
+                        }
+                    }
+                });
+            }
 
-            // var resource = await _apiClient.GetImageURLDataObject(response.Data.id, cancellationToken);
-
-            // var resource = new PredictionImageURLActionOutput
-            // {
-            //      TODO : map
-            // };
-
-            // If the response is already the output object for the action, you can use the response directly
-
-            // Build sync operations to update the local cache as well as the Xchange cache system (if the data type is cached)
-            // For more information on SyncOperations and the KeyResolver, check: https://trimble-xchange.github.io/connector-docs/guides/creating-actions/#keyresolver-and-the-sync-cache-operations
             var operations = new List<SyncOperation>();
-            var keyResolver = new DefaultDataObjectKey();
-            var key = keyResolver.BuildKeyResolver()(response.Data);
-            operations.Add(SyncOperation.CreateSyncOperation(UpdateOperation.Upsert.ToString(), key.UrlPart, key.PropertyNames, response.Data));
+            if (response.Data?.Result != null)
+            {
+                foreach (var result in response.Data.Result)
+                {
+                    var keyResolver = new DefaultDataObjectKey();
+                    var key = keyResolver.BuildKeyResolver()(result);
+                    operations.Add(SyncOperation.CreateSyncOperation(UpdateOperation.Upsert.ToString(), key.UrlPart, key.PropertyNames, result));
+                }
+            }
 
             var resultList = new List<CacheSyncCollection>
             {
-                new CacheSyncCollection() { DataObjectType = typeof(ImageURLDataObject), CacheChanges = operations.ToArray() }
+                new CacheSyncCollection() { DataObjectType = typeof(PredictionResult), CacheChanges = operations.ToArray() }
             };
 
             return ActionHandlerOutcome.Successful(response.Data, resultList);
         }
         catch (HttpRequestException exception)
         {
-            // If an error occurs, we want to create a failure result for the action that matches
-            // the failure type for the action. 
-            // Common to create extension methods to map to Standard Action Failure
-
+            _logger.LogError(exception, "Exception while submitting image URLs for prediction");
             var errorSource = new List<string> { "PredictionImageURLHandler" };
-            if (string.IsNullOrEmpty(exception.Source)) errorSource.Add(exception.Source!);
+            if (!string.IsNullOrEmpty(exception.Source)) errorSource.Add(exception.Source);
             
             return ActionHandlerOutcome.Failed(new StandardActionFailure
             {
                 Code = exception.StatusCode?.ToString() ?? "500",
-                Errors = new []
+                Errors = new[]
                 {
                     new Xchange.Connector.SDK.Action.Error
                     {

@@ -4,14 +4,34 @@ using Xchange.Connector.SDK.Client.ConnectionDefinitions.Attributes;
 
 namespace Connector.Connections;
 
-[ConnectionDefinition(title: "ApiKeyAuth", description: "")]
-public class ApiKeyAuth : IApiKeyAuth
+public interface INanonetsApiKeyAuth : IApiKeyAuth
 {
-    [ConnectionProperty(title: "ApiKey", description: "", isRequired: true, isSensitive: true)]
+    string ModelId { get; }
+}
+
+[ConnectionDefinition(title: "ApiKeyAuth", description: "Authentication for Nanonets API using API Key")]
+public class ApiKeyAuth : INanonetsApiKeyAuth
+{
+    [ConnectionProperty(
+        title: "API Key", 
+        description: "Your Nanonets API key. Can be found in Account Info -> API Keys section of the Nanonets dashboard.", 
+        isRequired: true, 
+        isSensitive: true)]
     public string ApiKey { get; init; } = string.Empty;
 
-    [ConnectionProperty(title: "Connection Environment", description: "", isRequired: true, isSensitive: false)]
+    [ConnectionProperty(
+        title: "Connection Environment", 
+        description: "The environment to connect to (Production or Test). Both environments use the same base URL for Nanonets.", 
+        isRequired: true, 
+        isSensitive: false)]
     public ConnectionEnvironmentApiKeyAuth ConnectionEnvironment { get; set; } = ConnectionEnvironmentApiKeyAuth.Unknown;
+
+    [ConnectionProperty(
+        title: "Model ID", 
+        description: "The Nanonets model ID to use for predictions.", 
+        isRequired: true, 
+        isSensitive: false)]
+    public string ModelId { get; init; } = string.Empty;
 
     public string BaseUrl
     {
@@ -20,9 +40,9 @@ public class ApiKeyAuth : IApiKeyAuth
             switch (ConnectionEnvironment)
             {
                 case ConnectionEnvironmentApiKeyAuth.Production:
-                    return "http://prod.example.com";
+                    return "https://app.nanonets.com";
                 case ConnectionEnvironmentApiKeyAuth.Test:
-                    return "http://test.example.com";
+                    return "https://app.nanonets.com";
                 default:
                     throw new Exception("No base url was set.");
             }

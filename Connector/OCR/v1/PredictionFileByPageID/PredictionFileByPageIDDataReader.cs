@@ -1,7 +1,8 @@
 using Connector.Client;
-using System;
+using Connector.Connections;
 using ESR.Hosting.CacheWriter;
 using Microsoft.Extensions.Logging;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -11,68 +12,85 @@ using System.Net.Http;
 
 namespace Connector.OCR.v1.PredictionFileByPageID;
 
+internal static class DataObjectExtensions
+{
+    public static bool TryGetParameterValue<T>(this DataObjectCacheWriteArguments args, string key, out T? value)
+    {
+        value = default;
+        if (args == null) return false;
+
+        var dict = args.GetType().GetProperty("Arguments")?.GetValue(args) as IDictionary<string, object>;
+        if (dict == null || !dict.ContainsKey(key)) return false;
+
+        try
+        {
+            value = (T)dict[key];
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+}
+
 public class PredictionFileByPageIDDataReader : TypedAsyncDataReaderBase<PredictionFileByPageIDDataObject>
 {
     private readonly ILogger<PredictionFileByPageIDDataReader> _logger;
-    private int _currentPage = 0;
+    private readonly ApiClient _apiClient;
+    private readonly INanonetsApiKeyAuth _apiKeyAuth;
 
     public PredictionFileByPageIDDataReader(
-        ILogger<PredictionFileByPageIDDataReader> logger)
+        ILogger<PredictionFileByPageIDDataReader> logger,
+        ApiClient apiClient,
+        INanonetsApiKeyAuth apiKeyAuth)
     {
         _logger = logger;
+        _apiClient = apiClient;
+        _apiKeyAuth = apiKeyAuth;
     }
 
-    public override async IAsyncEnumerable<PredictionFileByPageIDDataObject> GetTypedDataAsync(DataObjectCacheWriteArguments ? dataObjectRunArguments, [EnumeratorCancellation] CancellationToken cancellationToken)
+    public override async IAsyncEnumerable<PredictionFileByPageIDDataObject> GetTypedDataAsync(
+        DataObjectCacheWriteArguments? dataObjectRunArguments,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        while (true)
+        if (dataObjectRunArguments == null || !dataObjectRunArguments.TryGetParameterValue("page_id", out string? pageId) || string.IsNullOrEmpty(pageId))
         {
-            var response = new ApiResponse<PaginatedResponse<PredictionFileByPageIDDataObject>>();
-            // If the PredictionFileByPageIDDataObject does not have the same structure as the PredictionFileByPageID response from the API, create a new class for it and replace PredictionFileByPageIDDataObject with it.
-            // Example:
-            // var response = new ApiResponse<IEnumerable<PredictionFileByPageIDResponse>>();
+            _logger.LogError("page_id parameter is required but was not provided");
+            yield break;
+        }
 
-            // Make a call to your API/system to retrieve the objects/type for the connector's configuration.
-            try
-            {
-                //response = await _apiClient.GetRecords<PredictionFileByPageIDDataObject>(
-                //    relativeUrl: "predictionFileByPageIDs",
-                //    page: _currentPage,
-                //    cancellationToken: cancellationToken)
-                //    .ConfigureAwait(false);
-            }
-            catch (HttpRequestException exception)
-            {
-                _logger.LogError(exception, "Exception while making a read request to data object 'PredictionFileByPageIDDataObject'");
-                throw;
-            }
+        PredictionFileByPageIDResponse? data;
+        try
+        {
+            var response = await _apiClient.GetPredictionFileByPageId(
+                modelId: _apiKeyAuth.ModelId,
+                pageId: pageId,
+                cancellationToken: cancellationToken);
 
             if (!response.IsSuccessful)
             {
-                throw new Exception($"Failed to retrieve records for 'PredictionFileByPageIDDataObject'. API StatusCode: {response.StatusCode}");
+                _logger.LogError("Failed to retrieve prediction file. API StatusCode: {StatusCode}", response.StatusCode);
+                throw new Exception($"Failed to retrieve prediction file. API StatusCode: {response.StatusCode}");
             }
 
-            if (response.Data == null || !response.Data.Items.Any()) break;
+            data = response.Data;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Exception while making a read request to Nanonets API");
+            throw;
+        }
 
-            // Return the data objects to Cache.
-            foreach (var item in response.Data.Items)
-            {
-                // If new class was created to match the API response, create a new PredictionFileByPageIDDataObject object, map the properties and return a PredictionFileByPageIDDataObject.
+        if (data?.Result == null || !data.Result.Any())
+        {
+            _logger.LogWarning("No prediction data returned from the API");
+            yield break;
+        }
 
-                // Example:
-                //var resource = new PredictionFileByPageIDDataObject
-                //{
-                //// TODO: Map properties.      
-                //};
-                //yield return resource;
-                yield return item;
-            }
-
-            // Handle pagination per API client design
-            _currentPage++;
-            if (_currentPage >= response.Data.TotalPages)
-            {
-                break;
-            }
+        foreach (var result in data.Result)
+        {
+            yield return result;
         }
     }
 }

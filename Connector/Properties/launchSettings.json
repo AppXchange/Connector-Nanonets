@@ -26,6 +26,118 @@
         "DIFFYCACHE_DBLOCATION": "./databases",
         "ESR__QueueName": "localrun"
       }
+    },
+    "PredictionFiles Local Development": {
+      "commandName": "Project",
+      "commandLineArgs": "--isLocal true --moduleId app-1 --serviceType ActionProcessor --dataObjectUrl prediction-files",
+      "environmentVariables": {
+        "DIFFYCACHE_DBLOCATION": "./databases",
+        "ESR__QueueName": "localrun"
+      }
+    },
+    "PredictionFileByPageID Local Development": {
+      "commandName": "Project",
+      "commandLineArgs": "--isLocal true --moduleId app-1 --serviceType ActionProcessor --dataObjectUrl prediction-file-by-page-id",
+      "environmentVariables": {
+        "DIFFYCACHE_DBLOCATION": "./databases",
+        "ESR__QueueName": "localrun"
+      }
+    },
+    "PredictionFileByFileID Local Development": {
+      "commandName": "Project",
+      "commandLineArgs": "--isLocal true --moduleId app-1 --serviceType ActionProcessor --dataObjectUrl prediction-file-by-file-id",
+      "environmentVariables": {
+        "DIFFYCACHE_DBLOCATION": "./databases",
+        "ESR__QueueName": "localrun"
+      }
+    },
+    "AsyncPredictionImageFile Local Development": {
+      "commandName": "Project",
+      "commandLineArgs": "--isLocal true --moduleId app-1 --serviceType ActionProcessor --dataObjectUrl async-prediction-image-file",
+      "environmentVariables": {
+        "DIFFYCACHE_DBLOCATION": "./databases",
+        "ESR__QueueName": "localrun"
+      }
+    },
+    "PredictionImageFile Local Development": {
+      "commandName": "Project",
+      "commandLineArgs": "--isLocal true --moduleId app-1 --serviceType ActionProcessor --dataObjectUrl prediction-image-file",
+      "environmentVariables": {
+        "DIFFYCACHE_DBLOCATION": "./databases",
+        "ESR__QueueName": "localrun"
+      }
+    },
+    "AsyncPredictionImageURL Local Development": {
+      "commandName": "Project",
+      "commandLineArgs": "--isLocal true --moduleId app-1 --serviceType ActionProcessor --dataObjectUrl async-prediction-image-url",
+      "environmentVariables": {
+        "DIFFYCACHE_DBLOCATION": "./databases",
+        "ESR__QueueName": "localrun"
+      }
+    },
+    "PredictionImageURL Local Development": {
+      "commandName": "Project",
+      "commandLineArgs": "--isLocal true --moduleId app-1 --serviceType ActionProcessor --dataObjectUrl prediction-image-url",
+      "environmentVariables": {
+        "DIFFYCACHE_DBLOCATION": "./databases",
+        "ESR__QueueName": "localrun"
+      }
+    },
+    "TrainingImagesFileUpload Local Development": {
+      "commandName": "Project",
+      "commandLineArgs": "--isLocal true --moduleId app-1 --serviceType ActionProcessor --dataObjectUrl training-images-file",
+      "environmentVariables": {
+        "DIFFYCACHE_DBLOCATION": "./databases",
+        "ESR__QueueName": "localrun"
+      }
+    },
+    "TrainingImagesURLUpload Local Development": {
+      "commandName": "Project",
+      "commandLineArgs": "--isLocal true --moduleId app-1 --serviceType ActionProcessor --dataObjectUrl training-images-url",
+      "environmentVariables": {
+        "DIFFYCACHE_DBLOCATION": "./databases",
+        "ESR__QueueName": "localrun"
+      }
+    },
+    "TrainModel Local Development": {
+      "commandName": "Project",
+      "commandLineArgs": "--isLocal true --moduleId app-1 --serviceType ActionProcessor --dataObjectUrl train-model",
+      "environmentVariables": {
+        "DIFFYCACHE_DBLOCATION": "./databases",
+        "ESR__QueueName": "localrun"
+      }
+    },
+    "ImageClassification Local Development": {
+      "commandName": "Project",
+      "commandLineArgs": "--isLocal true --moduleId app-1 --serviceType ActionProcessor --dataObjectUrl image-classification",
+      "environmentVariables": {
+        "DIFFYCACHE_DBLOCATION": "./databases",
+        "ESR__QueueName": "localrun"
+      }
+    },
+    "ImageURLClassification Local Development": {
+      "commandName": "Project",
+      "commandLineArgs": "--isLocal true --moduleId app-1 --serviceType ActionProcessor --dataObjectUrl image-url-classification",
+      "environmentVariables": {
+        "DIFFYCACHE_DBLOCATION": "./databases",
+        "ESR__QueueName": "localrun"
+      }
+    },
+    "ExternalIntegrations Local Development": {
+      "commandName": "Project",
+      "commandLineArgs": "--isLocal true --moduleId app-1 --serviceType DataReader --dataObjectUrl external-integrations",
+      "environmentVariables": {
+        "DIFFYCACHE_DBLOCATION": "./databases",
+        "ESR__QueueName": "localrun"
+      }
+    },
+    "GenericQuery Local Development": {
+      "commandName": "Project",
+      "commandLineArgs": "--isLocal true --moduleId app-1 --serviceType ActionProcessor --dataObjectUrl generic-query",
+      "environmentVariables": {
+        "DIFFYCACHE_DBLOCATION": "./databases",
+        "ESR__QueueName": "localrun"
+      }
     }
   }
 }

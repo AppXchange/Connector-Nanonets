@@ -1,4 +1,5 @@
 using Connector.Client;
+using Connector.Connections;
 using System;
 using ESR.Hosting.CacheWriter;
 using Microsoft.Extensions.Logging;
@@ -14,65 +15,30 @@ namespace Connector.ImageClassification.v1.ImageURLs;
 public class ImageURLsDataReader : TypedAsyncDataReaderBase<ImageURLsDataObject>
 {
     private readonly ILogger<ImageURLsDataReader> _logger;
-    private int _currentPage = 0;
+    private readonly ApiClient _apiClient;
+    private readonly INanonetsApiKeyAuth _apiKeyAuth;
 
     public ImageURLsDataReader(
-        ILogger<ImageURLsDataReader> logger)
+        ILogger<ImageURLsDataReader> logger,
+        ApiClient apiClient,
+        INanonetsApiKeyAuth apiKeyAuth)
     {
         _logger = logger;
+        _apiClient = apiClient;
+        _apiKeyAuth = apiKeyAuth;
     }
 
-    public override async IAsyncEnumerable<ImageURLsDataObject> GetTypedDataAsync(DataObjectCacheWriteArguments ? dataObjectRunArguments, [EnumeratorCancellation] CancellationToken cancellationToken)
+    public override IAsyncEnumerable<ImageURLsDataObject> GetTypedDataAsync(
+        DataObjectCacheWriteArguments? dataObjectRunArguments,
+        CancellationToken cancellationToken)
     {
-        while (true)
+        if (dataObjectRunArguments == null)
         {
-            var response = new ApiResponse<PaginatedResponse<ImageURLsDataObject>>();
-            // If the ImageURLsDataObject does not have the same structure as the ImageURLs response from the API, create a new class for it and replace ImageURLsDataObject with it.
-            // Example:
-            // var response = new ApiResponse<IEnumerable<ImageURLsResponse>>();
-
-            // Make a call to your API/system to retrieve the objects/type for the connector's configuration.
-            try
-            {
-                //response = await _apiClient.GetRecords<ImageURLsDataObject>(
-                //    relativeUrl: "imageURLs",
-                //    page: _currentPage,
-                //    cancellationToken: cancellationToken)
-                //    .ConfigureAwait(false);
-            }
-            catch (HttpRequestException exception)
-            {
-                _logger.LogError(exception, "Exception while making a read request to data object 'ImageURLsDataObject'");
-                throw;
-            }
-
-            if (!response.IsSuccessful)
-            {
-                throw new Exception($"Failed to retrieve records for 'ImageURLsDataObject'. API StatusCode: {response.StatusCode}");
-            }
-
-            if (response.Data == null || !response.Data.Items.Any()) break;
-
-            // Return the data objects to Cache.
-            foreach (var item in response.Data.Items)
-            {
-                // If new class was created to match the API response, create a new ImageURLsDataObject object, map the properties and return a ImageURLsDataObject.
-
-                // Example:
-                //var resource = new ImageURLsDataObject
-                //{
-                //// TODO: Map properties.      
-                //};
-                //yield return resource;
-                yield return item;
-            }
-
-            // Handle pagination per API client design
-            _currentPage++;
-            if (_currentPage >= response.Data.TotalPages)
-            {
-                break;
-            }
+            _logger.LogError("Data object run arguments are required but were not provided");
+            return AsyncEnumerable.Empty<ImageURLsDataObject>();
         }
+
+        _logger.LogInformation("Image classification data reader is not supported as the model status endpoint is not available");
+        return AsyncEnumerable.Empty<ImageURLsDataObject>();
     }
 }

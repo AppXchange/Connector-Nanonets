@@ -12,13 +12,48 @@ using Xchange.Connector.SDK.CacheWriter;
 /// are properly formed. The schema also helps provide integrators more information for what the values 
 /// are intended to be.
 /// </summary>
-[PrimaryKey("id", nameof(Id))]
-//[AlternateKey("alt-key-id", nameof(CompanyId), nameof(EquipmentNumber))]
-[Description("Example description of the object.")]
+[PrimaryKey("file", nameof(File))]
+[Description("Data object representing a generic query result")]
 public class GenericQueryDataObject
 {
-    [JsonPropertyName("id")]
-    [Description("Example primary key of the object")]
+    [JsonPropertyName("birthplace")]
+    [Description("Place of birth")]
+    public string? Birthplace { get; init; }
+
+    [JsonPropertyName("dob")]
+    [Description("Date of birth")]
+    public string? Dob { get; init; }
+
+    [JsonPropertyName("doi")]
+    [Description("Date of issue")]
+    public string? Doi { get; init; }
+
+    [JsonPropertyName("file")]
+    [Description("File identifier")]
     [Required]
-    public required Guid Id { get; init; }
+    public required string File { get; init; }
+
+    [JsonPropertyName("firstname")]
+    [Description("First name")]
+    public string? Firstname { get; init; }
+
+    [JsonPropertyName("mrz")]
+    [Description("Machine Readable Zone data")]
+    public string? Mrz { get; init; }
+
+    [JsonPropertyName("nationality")]
+    [Description("Nationality")]
+    public string? Nationality { get; init; }
+
+    [JsonPropertyName("passport")]
+    [Description("Passport number")]
+    public string? Passport { get; init; }
+
+    [JsonPropertyName("sex")]
+    [Description("Gender")]
+    public string? Sex { get; init; }
+
+    [JsonPropertyName("surname")]
+    [Description("Last name")]
+    public string? Surname { get; init; }
 }

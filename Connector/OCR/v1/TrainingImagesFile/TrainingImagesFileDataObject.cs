@@ -2,6 +2,7 @@ namespace Connector.OCR.v1.TrainingImagesFile;
 
 using Json.Schema.Generation;
 using System;
+using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using Xchange.Connector.SDK.CacheWriter;
 
@@ -21,4 +22,37 @@ public class TrainingImagesFileDataObject
     [Description("Example primary key of the object")]
     [Required]
     public required Guid Id { get; init; }
+
+    [JsonPropertyName("file")]
+    public string File { get; set; } = string.Empty;
+
+    [JsonPropertyName("base64_data")]
+    public string? Base64Data { get; set; }
+
+    [JsonPropertyName("request_metadata")]
+    public Dictionary<string, string>? RequestMetadata { get; set; }
+
+    [JsonPropertyName("created_at")]
+    public DateTime CreatedAt { get; set; }
+
+    [JsonPropertyName("updated_at")]
+    public DateTime UpdatedAt { get; set; }
+
+    [JsonPropertyName("status")]
+    public string Status { get; set; } = string.Empty;
+
+    [JsonPropertyName("message")]
+    public string? Message { get; set; }
+
+    [JsonPropertyName("signed_urls")]
+    public List<SignedUrlInfo>? SignedUrls { get; set; }
+}
+
+public class SignedUrlInfo
+{
+    [JsonPropertyName("url")]
+    public string Url { get; set; } = string.Empty;
+
+    [JsonPropertyName("expires_at")]
+    public DateTime ExpiresAt { get; set; }
 }

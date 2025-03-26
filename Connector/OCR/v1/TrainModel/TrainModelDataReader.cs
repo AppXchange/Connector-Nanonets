@@ -1,4 +1,5 @@
 using Connector.Client;
+using Connector.Connections;
 using System;
 using ESR.Hosting.CacheWriter;
 using Microsoft.Extensions.Logging;
@@ -8,71 +9,68 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using Xchange.Connector.SDK.CacheWriter;
 using System.Net.Http;
+using Connector.OCR.v1.TrainModel.Train;
 
 namespace Connector.OCR.v1.TrainModel;
 
 public class TrainModelDataReader : TypedAsyncDataReaderBase<TrainModelDataObject>
 {
     private readonly ILogger<TrainModelDataReader> _logger;
-    private int _currentPage = 0;
+    private readonly ApiClient _apiClient;
+    private readonly INanonetsApiKeyAuth _apiKeyAuth;
 
     public TrainModelDataReader(
-        ILogger<TrainModelDataReader> logger)
+        ILogger<TrainModelDataReader> logger,
+        ApiClient apiClient,
+        INanonetsApiKeyAuth apiKeyAuth)
     {
         _logger = logger;
+        _apiClient = apiClient;
+        _apiKeyAuth = apiKeyAuth;
     }
 
-    public override async IAsyncEnumerable<TrainModelDataObject> GetTypedDataAsync(DataObjectCacheWriteArguments ? dataObjectRunArguments, [EnumeratorCancellation] CancellationToken cancellationToken)
+    public override async IAsyncEnumerable<TrainModelDataObject> GetTypedDataAsync(
+        DataObjectCacheWriteArguments? dataObjectRunArguments,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        while (true)
+        if (dataObjectRunArguments == null)
         {
-            var response = new ApiResponse<PaginatedResponse<TrainModelDataObject>>();
-            // If the TrainModelDataObject does not have the same structure as the TrainModel response from the API, create a new class for it and replace TrainModelDataObject with it.
-            // Example:
-            // var response = new ApiResponse<IEnumerable<TrainModelResponse>>();
+            _logger.LogError("Data object run arguments are required but were not provided");
+            yield break;
+        }
 
-            // Make a call to your API/system to retrieve the objects/type for the connector's configuration.
-            try
+        ApiResponse<TrainTrainModelActionOutput>? response = null;
+        try
+        {
+            response = await _apiClient.TrainModel(
+                modelId: _apiKeyAuth.ModelId,
+                cancellationToken: cancellationToken);
+
+            if (!response.IsSuccessful || response.Data == null)
             {
-                //response = await _apiClient.GetRecords<TrainModelDataObject>(
-                //    relativeUrl: "trainModels",
-                //    page: _currentPage,
-                //    cancellationToken: cancellationToken)
-                //    .ConfigureAwait(false);
+                _logger.LogError("Failed to train model. API StatusCode: {StatusCode}", response.StatusCode);
+                yield break;
             }
-            catch (HttpRequestException exception)
+        }
+        catch (HttpRequestException exception)
+        {
+            _logger.LogError(exception, "Exception while training model");
+            throw;
+        }
+
+        if (response?.Data != null)
+        {
+            yield return new TrainModelDataObject
             {
-                _logger.LogError(exception, "Exception while making a read request to data object 'TrainModelDataObject'");
-                throw;
-            }
-
-            if (!response.IsSuccessful)
-            {
-                throw new Exception($"Failed to retrieve records for 'TrainModelDataObject'. API StatusCode: {response.StatusCode}");
-            }
-
-            if (response.Data == null || !response.Data.Items.Any()) break;
-
-            // Return the data objects to Cache.
-            foreach (var item in response.Data.Items)
-            {
-                // If new class was created to match the API response, create a new TrainModelDataObject object, map the properties and return a TrainModelDataObject.
-
-                // Example:
-                //var resource = new TrainModelDataObject
-                //{
-                //// TODO: Map properties.      
-                //};
-                //yield return resource;
-                yield return item;
-            }
-
-            // Handle pagination per API client design
-            _currentPage++;
-            if (_currentPage >= response.Data.TotalPages)
-            {
-                break;
-            }
+                ModelId = response.Data.ModelId ?? string.Empty,
+                ModelType = response.Data.ModelType,
+                State = response.Data.State,
+                Categories = response.Data.Categories?.Select(c => new Category 
+                { 
+                    Name = c.Name,
+                    Count = c.Count 
+                }).ToList()
+            };
         }
     }
 }

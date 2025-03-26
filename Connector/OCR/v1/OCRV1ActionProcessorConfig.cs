@@ -5,6 +5,7 @@ using Connector.OCR.v1.ImageURL.AsyncPrediction;
 using Connector.OCR.v1.ImageURL.Prediction;
 using Connector.OCR.v1.TrainingImagesFile.Upload;
 using Connector.OCR.v1.TrainingImagesURL.Upload;
+using Connector.OCR.v1.TrainModel.Train;
 using Json.Schema.Generation;
 using Xchange.Connector.SDK.Action;
 
@@ -25,4 +26,5 @@ public class OCRV1ActionProcessorConfig
     public DefaultActionHandlerConfig PredictionImageURLConfig { get; set; } = new();
     public DefaultActionHandlerConfig UploadTrainingImagesFileConfig { get; set; } = new();
     public DefaultActionHandlerConfig UploadTrainingImagesURLConfig { get; set; } = new();
+    public DefaultActionHandlerConfig TrainTrainModelConfig { get; set; } = new();
 }
